@@ -117,8 +117,7 @@ async def show_matches(chat_id, context):
     if not matches:
         await context.bot.send_message(chat_id, "Поки що немає збігів 💔")
     else:
-        result = "💖 Питання зі збігом:
-" + "\n".join(f"• {q}" for q in matches)
+        result = "💖 Питання зі збігом:" + "\n".join(f"• {q}" for q in matches)
         await context.bot.send_message(chat_id, result)
 
 def reset_game(chat_id):
