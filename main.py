@@ -1,88 +1,30 @@
-import logging
-import random
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-
-logging.basicConfig(level=logging.INFO)
-
-# Завантаження запитань
-with open("questions.txt", "r", encoding="utf-8") as f:
-    QUESTIONS = [line.strip() for line in f if line.strip()]
-
-# Стан гравців
-players = {}
-pairs = {}  # chat_id: [user1_id, user2_id]
-answers = {}  # chat_id: {question_id: {user_id: answer}}
-asked_questions = {}  # chat_id: [question_ids]
-
-START_KEYBOARD = ReplyKeyboardMarkup([["Так", "Ні"]], resize_keyboard=True)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-
-    if chat_id not in pairs:
-        pairs[chat_id] = [user_id]
-        await update.message.reply_text("Чекаємо на другого гравця...")
-    elif user_id not in pairs[chat_id]:
-        pairs[chat_id].append(user_id)
-        await update.message.reply_text("🎉 Гравці з'єднані! Починаємо гру.")
-        await send_next_question(chat_id, context)
-    else:
-        await update.message.reply_text("Ти вже в грі!")
-
-async def send_next_question(chat_id, context):
-    asked = asked_questions.get(chat_id, [])
-    if len(asked) >= len(QUESTIONS):
-        await context.bot.send_message(chat_id, "Гру завершено — питань більше нема ✨")
+    if chat_id not in pairs or len(pairs[chat_id]) < 2:
+        await update.message.reply_text("Гра ще не почалась або недостатньо гравців.")
         return
 
-    while True:
-        q_id = random.randint(0, len(QUESTIONS) - 1)
-        if q_id not in asked:
-            break
+    p1, p2 = pairs[chat_id]
+    name1 = user_names.get(p1, "Гравець 1")
+    name2 = user_names.get(p2, "Гравець 2")
 
-    asked.append(q_id)
-    asked_questions[chat_id] = asked
-    q_text = QUESTIONS[q_id]
+    total = 0
+    matches = 0
+    summary = "📋 *Питання, на які був збіг:*\n\n"
 
-    if chat_id not in answers:
-        answers[chat_id] = {}
-    answers[chat_id][q_id] = {}
+    for q_id in asked_questions.get(chat_id, []):
+        a1 = answers[chat_id][q_id].get(p1)
+        a2 = answers[chat_id][q_id].get(p2)
+        if a1 and a2:
+            total += 1
+            if a1 == a2:
+                matches += 1
+                summary += f"❓ *{QUESTIONS[q_id]}*\n{name1}: {a1}\n{name2}: {a2}\n\n"
 
-    await context.bot.send_message(chat_id, f"❓ {q_text}", reply_markup=START_KEYBOARD)
+    if matches == 0:
+        summary += "Жодного збігу не було 🫣\n\n"
 
-async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    text = update.message.text.strip().lower()
+    percent = round((matches / total) * 100, 1) if total > 0 else 0
+    summary += f"📊 *Збігів:* {matches} з {total} ({percent}%)"
 
-    if text not in ["так", "ні"]:
-        return
-
-    if chat_id not in asked_questions or chat_id not in pairs:
-        return
-
-    q_id = asked_questions[chat_id][-1]
-    answers[chat_id][q_id][user_id] = text
-
-    # Чекаємо на другу відповідь
-    if len(answers[chat_id][q_id]) < 2:
-        await update.message.reply_text("Очікуємо відповідь іншого гравця...")
-        return
-
-    vals = list(answers[chat_id][q_id].values())
-    if vals[0] == vals[1]:
-        await context.bot.send_message(chat_id, f"✅ Збіг! Обоє відповіли " + ("так." if vals[0] == "так" else "ні."))
-    else:
-        await context.bot.send_message(chat_id, f"❌ Немає збігу.")
-
-    await send_next_question(chat_id, context)
-
-if __name__ == '__main__':
-    app = ApplicationBuilder().token("8194716705:AAG8dvxKlRggAlCzMrzSIEX7xm1v0cubAGE").build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_response))
-
-    app.run_polling()
+    await context.bot.send_message(chat_id, summary, parse_mode="Markdown")
