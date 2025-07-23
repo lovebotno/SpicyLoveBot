@@ -17,7 +17,7 @@ asked_questions = {}  # chat_id: [question_ids]
 matched_questions = {}  # chat_id: [question_texts]
 paused = {}  # chat_id: bool
 
-BUTTONS = [["Так", "Ні"], ["Пауза", "Зупинити"], ["Почати заново", "Збіги"]]
+BUTTONS = [["Так", "Ні", "Можливо"], ["Пауза", "Зупинити"], ["Почати заново", "Збіги"]]
 START_KEYBOARD = ReplyKeyboardMarkup(BUTTONS, resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,7 +85,7 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_matches(chat_id, context)
         return
 
-    if text not in ["так", "ні"]:
+    if text not in ["так", "ні", "Можливо"]:
         return
 
     if chat_id not in asked_questions or chat_id not in pairs:
