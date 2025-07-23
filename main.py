@@ -17,7 +17,7 @@ asked_questions = {}  # chat_id: [question_ids]
 matched_questions = {}  # chat_id: [question_texts]
 paused = {}  # chat_id: bool
 
-BUTTONS = [["Так", "Ні", "Можливо"], ["Пауза", "Зупинити"], ["Почати заново", "Збіги"]]
+BUTTONS = [["Так", "Ні", "Точно не впевнений"], ["Продовжити", "Пауза"], ["Почати заново", "Зупинити", "Збіги"]]
 START_KEYBOARD = ReplyKeyboardMarkup(BUTTONS, resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,7 +70,15 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "пауза":
         paused[chat_id] = True
-        await update.message.reply_text("⏸️ Гру призупинено.")
+        await update.message.reply_text("⏸️ Гру призупинено. Натисніть 'Продовжити' щоб відновити гру.")
+        return
+    elif text == "продовжити":
+        if paused.get(chat_id):
+            paused[chat_id] = False
+            await update.message.reply_text("▶️ Гру відновлено.")
+            await send_next_question(chat_id, context)
+        else:
+            await update.message.reply_text("Гра вже активна.")
         return
     elif text == "зупинити":
         await show_matches(chat_id, context)
@@ -79,20 +87,21 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     elif text == "почати заново":
         reset_game(chat_id)
+        pairs[chat_id] = [user_id]
         await update.message.reply_text("🔄 Починаємо спочатку! Очікуємо на двох гравців...", reply_markup=START_KEYBOARD)
         return
     elif text == "збіги":
         await show_matches(chat_id, context)
         return
 
-    if text not in ["так", "ні", "Можливо"]:
+    if text not in ["так", "ні", "точно не впевнений"]:
         return
 
     if chat_id not in asked_questions or chat_id not in pairs:
         return
 
     if paused.get(chat_id):
-        await update.message.reply_text("⏸️ Гру на паузі. Натисніть 'Почати заново' для нового раунду.")
+        await update.message.reply_text("⏸️ Гру на паузі. Натисніть 'Продовжити' щоб відновити гру.")
         return
 
     q_id = asked_questions[chat_id][-1]
@@ -104,7 +113,7 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     vals = list(answers[chat_id][q_id].values())
     q_text = QUESTIONS[q_id]
-    if vals[0] == vals[1] and vals[0] != "не впевнений":
+    if vals[0] == vals[1]:
         await context.bot.send_message(chat_id, f"✅ Збіг! Обоє відповіли {vals[0]}.")
         matched_questions.setdefault(chat_id, []).append(q_text)
     else:
@@ -117,7 +126,7 @@ async def show_matches(chat_id, context):
     if not matches:
         await context.bot.send_message(chat_id, "Поки що немає збігів 💔")
     else:
-        result = "💖 Питання зі збігом:" + "\n".join(f"• {q}" for q in matches)
+        result = "💖 Питання зі збігом:\n" + "\n".join(f"• {q}" for q in matches)
         await context.bot.send_message(chat_id, result)
 
 def reset_game(chat_id):
@@ -127,7 +136,7 @@ def reset_game(chat_id):
     paused[chat_id] = False
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("/start — почати гру\n/help — допомога\nКнопки: Так, Ні, Пауза, Зупинити, Почати заново, Збіги")
+    await update.message.reply_text("/start — почати гру\n/help — допомога\nКнопки: Так, Ні, Точно не впевнений, Пауза, Продовжити, Зупинити, Почати заново, Збіги")
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token("8194716705:AAG8dvxKlRggAlCzMrzSIEX7xm1v0cubAGE").build()
