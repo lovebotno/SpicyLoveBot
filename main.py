@@ -104,7 +104,7 @@ async def handle_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     vals = list(answers[chat_id][q_id].values())
     q_text = QUESTIONS[q_id]
-    if vals[0] == vals[1]:
+    if vals[0] == vals[1] and vals[0] != "не впевнений":
         await context.bot.send_message(chat_id, f"✅ Збіг! Обоє відповіли {vals[0]}.")
         matched_questions.setdefault(chat_id, []).append(q_text)
     else:
